@@ -1,95 +1,134 @@
 #!/usr/bin/env python
 
 import asyncio
+from typing import Tuple
 import websockets
+from websockets import server
 import threading
 import collections
+from enum import Enum
 
 BUF_SIZE = 64
+
+class PacketType(Enum):
+    SUBSCRIBE = "s"
+    DATA = "d"
+    UNSUBSCRIBE = "u"
+    def __str__(self) -> str:
+        return self.value
+
+PROTOCOL = "|"
+
 TOPICS = set()
-KILL_SYNC = threading.Semaphore(1)
-TELEM_SYNC = threading.Semaphore(1)
+KILL_SYNC = threading.Lock()
+TELEM_SYNC = threading.Lock()
+CONNECTION_SYNC = threading.Lock()
 
 TELEMETRY: dict[str, collections.deque] = dict()
+connection: server.WebSocketServerProtocol = None
 t: threading.Thread = threading.Thread(target=None)
 kill: bool = False
 
-async def connect(uri: str, topic: str):
-    async with websockets.connect(uri) as websocket:
-        async for message in websocket:
-            KILL_SYNC.acquire()
-            if kill:
-                KILL_SYNC.release()
-                break
+def wrap(msg_type: PacketType, msg: str) -> str:
+    return "{}{}{}".format(str(msg_type), PROTOCOL, msg)
+
+def unwrap(msg: str) -> Tuple[str, str]:
+    unwrapped = msg.split(PROTOCOL, maxsplit=1)
+    if len(unwrapped) < 2:
+        print("[Warn] Invalid message")
+        return ("", "")
+    return (unwrapped[0], unwrapped[1])
+
+async def subscribe(topic: str):
+    await connection.send(wrap(PacketType.SUBSCRIBE, topic))
+
+async def connect(uri: str):
+    global connection
+    try:
+        async with websockets.connect(uri) as websocket:
+            connection = websocket
+            CONNECTION_SYNC.release()
+            async for message in websocket:
+                with KILL_SYNC:
+                    if kill:
+                        break
+                with TELEM_SYNC:
+                    topic, data = unwrap(message)
+                    TELEMETRY[topic].append(data)
+    finally:
+        if CONNECTION_SYNC.locked():
+            CONNECTION_SYNC.release()
+        if KILL_SYNC.locked():
             KILL_SYNC.release()
-            TELEM_SYNC.acquire()
-            TELEMETRY[topic].append(message)
+        if TELEM_SYNC.locked():
             TELEM_SYNC.release()
 
-async def __start():  
-    await asyncio.gather(
-        *[connect("ws://localhost:8765/{topic}".format(topic=topic), topic) for topic in TOPICS]
-    )
-
 def _start():
-    asyncio.run(__start())
+    asyncio.run(connect("ws://localhost:8765/"))
 
 ## API ##
 
 def start():
     global t
     t = threading.Thread(target=_start)
+    CONNECTION_SYNC.acquire()
     t.start()
 
 def stop():
-    global kill, t
+    global kill, t, connection
     if t.is_alive:
-        KILL_SYNC.acquire()
-        kill = True
-        KILL_SYNC.release()
+        asyncio.new_event_loop().run_until_complete(connection.close())
+        with KILL_SYNC:
+            kill = True
         t.join()
+        connection = None
 
 def watch(topic: str):
+    with CONNECTION_SYNC:
+        pass  # Makes sure we have actually connected
+    if connection is None:
+        print("[Err] Not conncted, nothing to watch")
     TELEM_SYNC.acquire()
     TELEMETRY[topic] = collections.deque(maxlen=BUF_SIZE)
     TELEM_SYNC.release()
+    asyncio.run(subscribe(topic))
     TOPICS.add(topic)
 
 def chomp(topic: str):
     if topic not in TELEMETRY:
         raise IndexError
     
-    TELEM_SYNC.acquire()
-    if len(TELEMETRY[topic]) == 0:
-        TELEM_SYNC.release()
-        return None
+    with TELEM_SYNC:
+        if len(TELEMETRY[topic]) == 0:
+            return None
     
-    ret = TELEMETRY[topic].popleft()
-    TELEM_SYNC.release()
+        ret = TELEMETRY[topic].popleft()
     return ret
 
 def reduceToFlag(topic: str, target: bool) -> bool:
     if topic not in TELEMETRY:
         raise IndexError
-    TELEM_SYNC.acquire()
-    ret = TELEMETRY[topic].count(str(target))
-    TELEMETRY[topic].clear()
-    TELEM_SYNC.release()
+    with TELEM_SYNC:
+        ret = TELEMETRY[topic].count(str(target))
+        TELEMETRY[topic].clear()
     return ret > 0
 
 def reduceToFloat(topic: str) -> float:
     if topic not in TELEMETRY:
         raise IndexError
     ret = 0
-    TELEM_SYNC.acquire()
-    telem_count = len(TELEMETRY)
+    with TELEM_SYNC:
+        telem_count = len(TELEMETRY)
 
+        if telem_count == 0:
+            return None
+
+        while len(TELEMETRY[topic]) > 0:
+            try:
+                ret += float(TELEMETRY[topic].popleft())
+            except ValueError:
+                telem_count -= 1  # We don't want invalid values to count!
     if telem_count == 0:
-        TELEM_SYNC.release()
-        return None
-
-    while len(TELEMETRY[topic]) > 0:
-        ret += float(TELEMETRY[topic].popleft())
-    
-    TELEM_SYNC.release()
-    return ret / telem_count
+        return 0.0
+    else:
+        return ret / telem_count
