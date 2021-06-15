@@ -18,7 +18,7 @@ class PacketType(Enum):
         return self.value
 
 PROTOCOL = "|"
-
+loop: asyncio.AbstractEventLoop = None
 TOPICS = set()
 KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
@@ -43,7 +43,8 @@ async def subscribe(topic: str):
     await connection.send(wrap(PacketType.SUBSCRIBE, topic))
 
 async def connect(uri: str):
-    global connection
+    global connection, loop
+    loop = asyncio.get_event_loop()
     try:
         async with websockets.connect(uri) as websocket:
             connection = websocket
@@ -77,7 +78,11 @@ def start():
 def stop():
     global kill, t, connection
     if t.is_alive:
-        asyncio.new_event_loop().run_until_complete(connection.close())
+        res = asyncio.run_coroutine_threadsafe(connection.close(), loop=loop)
+        try:
+            res.result(2)  # Timeout after 2 seconds if it really can't close
+        except asyncio.TimeoutError:
+            print("Failed to close connection gracefully")
         with KILL_SYNC:
             kill = True
         t.join()
