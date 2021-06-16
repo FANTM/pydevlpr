@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import asyncio
+import logging
 from typing import Tuple
 import websockets
 from websockets import server
@@ -18,14 +19,14 @@ class PacketType(Enum):
         return self.value
 
 PROTOCOL = "|"
-loop: asyncio.AbstractEventLoop = None
-TOPICS = set()
+TOPICS  = set()
 KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
 CONNECTION_SYNC = threading.Lock()
-
+CONN_INFO = ("localhost", 8765)
 TELEMETRY: dict[str, collections.deque] = dict()
 connection: server.WebSocketServerProtocol = None
+loop: asyncio.AbstractEventLoop = None
 t: threading.Thread = threading.Thread(target=None)
 kill: bool = False
 
@@ -65,16 +66,20 @@ async def connect(uri: str):
             TELEM_SYNC.release()
 
 def _start():
-    asyncio.run(connect("ws://localhost:8765/"))
+    asyncio.run(connect("ws://{}:{}/".format(CONN_INFO[0], CONN_INFO[1])))
 
 ## API ##
 
+# start(None)
+# Called first. It initializes a connection to the DEVLPR backend. Must be called first if you want anything else to work
 def start():
     global t
     t = threading.Thread(target=_start)
     CONNECTION_SYNC.acquire()
     t.start()
 
+# stop(None)
+# Called last. It will disconnect from the backend and end all communication
 def stop():
     global kill, t, connection
     if t.is_alive:
@@ -88,6 +93,8 @@ def stop():
         t.join()
         connection = None
 
+# watch(topic:str)
+# Start collecting data from a channel.
 def watch(topic: str):
     with CONNECTION_SYNC:
         pass  # Makes sure we have actually connected
@@ -110,17 +117,19 @@ def chomp(topic: str):
         ret = TELEMETRY[topic].popleft()
     return ret
 
-def reduceToFlag(topic: str, target: bool) -> bool:
+def reduceToFlag(topic: str) -> bool:
     if topic not in TELEMETRY:
-        raise IndexError
+        logging.error("Not watching topic")
+        return False
     with TELEM_SYNC:
-        ret = TELEMETRY[topic].count(str(target))
+        ret = TELEMETRY[topic].count("True")
         TELEMETRY[topic].clear()
     return ret > 0
 
 def reduceToFloat(topic: str) -> float:
     if topic not in TELEMETRY:
-        raise IndexError
+        logging.error("Not watching topic")
+        return False
     ret = 0
     with TELEM_SYNC:
         telem_count = len(TELEMETRY)
