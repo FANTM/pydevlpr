@@ -19,6 +19,12 @@ class PacketType(Enum):
         return self.value
 
 PROTOCOL = "|"
+
+RAW_DATA_TOPIC = "r"
+MAIN_DATA_TOPIC = "d"
+GRIP_RIGHT_TOPIC = "gr"
+GRIP_LEFT_TOPIC = "gl"
+
 TOPICS  = set()
 KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
@@ -66,7 +72,8 @@ async def connect(uri: str):
             TELEM_SYNC.release()
 
 def _start():
-    asyncio.run(connect("ws://{}:{}/".format(CONN_INFO[0], CONN_INFO[1])))
+    uri = "ws://{}:{}".format(CONN_INFO[0], CONN_INFO[1])
+    asyncio.run(connect(uri))
 
 ## API ##
 
