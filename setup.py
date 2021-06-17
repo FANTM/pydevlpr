@@ -7,7 +7,7 @@ LONG_DESCRIPTION = 'Glue to attach any application to a FANTM device over websoc
 # Setting up
 setup(
        # the name must match the folder name 'verysimplemodule'
-        name="devlpr_plugin", 
+        name="libdevlpr", 
         version=VERSION,
         author="Ezra Boley",
         author_email="hello@getfantm.com",
@@ -15,7 +15,7 @@ setup(
         long_description=LONG_DESCRIPTION,
         packages=find_packages(),
         install_requires=['asyncio', 'websockets'], # add any additional packages that 
-        # needs to be installed along with your package. Eg: 'caer'
+        # needs to be installed along with your package.
         
         keywords=['python', 'FANTM', 'DEVLPR'],
         classifiers= [

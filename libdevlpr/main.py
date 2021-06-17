@@ -1,50 +1,29 @@
 #!/usr/bin/env python
 
 import asyncio
+import collections
 import logging
-from typing import Tuple
+import threading
+from typing import Callable, List
+
 import websockets
 from websockets import server
-import threading
-import collections
-from enum import Enum
+
+from .protocol import *
+CallbackList_t = List[Callable[[str], None]]
 
 BUF_SIZE = 64
-
-class PacketType(Enum):
-    SUBSCRIBE = "s"
-    DATA = "d"
-    UNSUBSCRIBE = "u"
-    def __str__(self) -> str:
-        return self.value
-
-PROTOCOL = "|"
-
-RAW_DATA_TOPIC = "r"
-MAIN_DATA_TOPIC = "d"
-GRIP_RIGHT_TOPIC = "gr"
-GRIP_LEFT_TOPIC = "gl"
-
 TOPICS  = set()
 KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
 CONNECTION_SYNC = threading.Lock()
 CONN_INFO = ("localhost", 8765)
 TELEMETRY: dict[str, collections.deque] = dict()
+CALLBACKS: dict[str, CallbackList_t] = dict()
 connection: server.WebSocketServerProtocol = None
 loop: asyncio.AbstractEventLoop = None
 t: threading.Thread = threading.Thread(target=None)
 kill: bool = False
-
-def wrap(msg_type: PacketType, msg: str) -> str:
-    return "{}{}{}".format(str(msg_type), PROTOCOL, msg)
-
-def unwrap(msg: str) -> Tuple[str, str]:
-    unwrapped = msg.split(PROTOCOL, maxsplit=1)
-    if len(unwrapped) < 2:
-        print("[Warn] Invalid message")
-        return ("", "")
-    return (unwrapped[0], unwrapped[1])
 
 async def subscribe(topic: str):
     await connection.send(wrap(PacketType.SUBSCRIBE, topic))
@@ -62,6 +41,9 @@ async def connect(uri: str):
                         break
                 with TELEM_SYNC:
                     topic, data = unwrap(message)
+                    if topic in CALLBACKS:
+                        for callback in CALLBACKS[topic]:
+                            callback(data)
                     TELEMETRY[topic].append(data)
     finally:
         if CONNECTION_SYNC.locked():
@@ -124,7 +106,7 @@ def chomp(topic: str):
         ret = TELEMETRY[topic].popleft()
     return ret
 
-def reduceToFlag(topic: str) -> bool:
+def reduce_to_flag(topic: str) -> bool:
     if topic not in TELEMETRY:
         logging.error("Not watching topic")
         return False
@@ -133,7 +115,7 @@ def reduceToFlag(topic: str) -> bool:
         TELEMETRY[topic].clear()
     return ret > 0
 
-def reduceToFloat(topic: str) -> float:
+def reduce_to_float(topic: str) -> float:
     if topic not in TELEMETRY:
         logging.error("Not watching topic")
         return False
@@ -153,3 +135,8 @@ def reduceToFloat(topic: str) -> float:
         return 0.0
     else:
         return ret / telem_count
+
+def add_callback(fn: Callable[[str], None], topic: str):
+    if topic not in CALLBACKS:
+        CALLBACKS[topic] = list()
+    CALLBACKS[topic].append(fn)

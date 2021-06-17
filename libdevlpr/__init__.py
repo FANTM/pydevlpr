@@ -4,7 +4,10 @@ from .main import (
     stop,
     chomp,
     reduceToFlag,
-    reduceToFloat,
+    reduceToFloat
+)
+
+from .protocol import (
     GRIP_LEFT_TOPIC,
     GRIP_RIGHT_TOPIC,
     RAW_DATA_TOPIC,
