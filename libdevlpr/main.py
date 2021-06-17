@@ -76,7 +76,7 @@ def stop():
         try:
             res.result(2)  # Timeout after 2 seconds if it really can't close
         except asyncio.TimeoutError:
-            print("Failed to close connection gracefully")
+            logging.error("Failed to close connection gracefully")
         with KILL_SYNC:
             kill = True
         t.join()
@@ -88,7 +88,8 @@ def watch(topic: str):
     with CONNECTION_SYNC:
         pass  # Makes sure we have actually connected
     if connection is None:
-        print("[Err] Not conncted, nothing to watch")
+        logging.error("Not connected, nothing to watch")
+        return
     TELEM_SYNC.acquire()
     TELEMETRY[topic] = collections.deque(maxlen=BUF_SIZE)
     TELEM_SYNC.release()

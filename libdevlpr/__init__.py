@@ -3,8 +3,8 @@ from .main import (
     start,
     stop,
     chomp,
-    reduceToFlag,
-    reduceToFloat
+    reduce_to_flag,
+    reduce_to_float
 )
 
 from .protocol import (
