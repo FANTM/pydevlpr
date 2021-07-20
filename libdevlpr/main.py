@@ -17,17 +17,16 @@ KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
 CONNECTION_SYNC = threading.Lock()
 CONN_INFO = ("localhost", 8765)
-TELEMETRY: dict[str, dict[str, CallbackList_t]] = dict()
 CALLBACKS: dict[str, dict[str, CallbackList_t]] = dict()
 connection: server.WebSocketServerProtocol = None
 loop: asyncio.AbstractEventLoop = None
 t: threading.Thread = threading.Thread(target=None)
 kill: bool = False
 
-async def subscribe(topic: str):
+async def subscribe(topic: str) -> None:
     await connection.send(wrap(PacketType.SUBSCRIBE, topic))
 
-async def connect(uri: str):
+async def connect(uri: str) -> None:
     global connection, loop
     loop = asyncio.get_event_loop()
     try:
@@ -43,7 +42,6 @@ async def connect(uri: str):
                     if topic in CALLBACKS:
                         for callback in CALLBACKS[topic][pin]:
                             callback(data)
-                    TELEMETRY[topic][pin] = data
     except ConnectionError:
         logging.error("Failed to connect")
     finally:
@@ -59,7 +57,7 @@ async def connect(uri: str):
 def start():
     global t
     uri = "ws://{}:{}".format(CONN_INFO[0], CONN_INFO[1])
-    t = threading.Thread(target=connect, args=(uri))
+    t = threading.Thread(target=asyncio.run, args=[connect(uri)])
     CONNECTION_SYNC.acquire()
     t.start()
 
@@ -71,7 +69,7 @@ def start_if_needed():
 
 # stop(None)
 # Called last. It will disconnect from the backend and end all communication
-def stop():
+def stop() -> None:
     global kill, t, connection
     if t.is_alive:
         if connection is not None:
@@ -85,22 +83,12 @@ def stop():
         t.join()
         connection = None
 
-def poll(topic: str, pin: int) -> str:
-    start_if_needed()
-    with TELEM_SYNC:
-        if topic not in TELEMETRY:
-            logging.warn("Invalid topic")
-            return ""
-        if str(pin) not in TELEMETRY[topic]:
-            logging.warn("Not getting any data from this pin")
-            return ""
-        return TELEMETRY[topic][str(pin)]
-
-def add_callback(topic: str, pin: int, fn: Callback_t):
-    pin_str = str(pin)
+def add_callback(topic: str, pin: int, fn: Callback_t) -> None:
     start_if_needed()
     if topic not in CALLBACKS:
         CALLBACKS[topic] = dict()
-    if pin_str not in CALLBACKS[topic]:
-        CALLBACKS[topic][pin_str] = list()
-    CALLBACKS[topic][pin_str].append(fn)
+    if pin not in CALLBACKS[topic]:
+        CALLBACKS[topic][pin] = list()
+        with CONNECTION_SYNC:
+            asyncio.run_coroutine_threadsafe(subscribe(topic), loop=loop)
+    CALLBACKS[topic][pin].append(fn)
