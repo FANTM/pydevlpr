@@ -70,6 +70,8 @@ def start_if_needed():
 # stop(None)
 # Called last. It will disconnect from the backend and end all communication
 def stop() -> None:
+    """ It will disconnect from the backend and end all communication"""
+
     global kill, t, connection
     if t.is_alive:
         if connection is not None:
@@ -90,5 +92,18 @@ def add_callback(topic: str, pin: int, fn: Callback_t) -> None:
     if pin not in CALLBACKS[topic]:
         CALLBACKS[topic][pin] = list()
         with CONNECTION_SYNC:
+            if connection is None or connection.closed: # asyncio.run_coroutine_threadsafe(get_connection_open(), loop=loop).result(2):
+                raise ConnectionError
             asyncio.run_coroutine_threadsafe(subscribe(topic), loop=loop)
     CALLBACKS[topic][pin].append(fn)
+
+
+def remove_callback(topic: str, pin: int, fn: Callback_t) -> None:
+    if topic not in CALLBACKS:
+        return
+    if pin not in CALLBACKS[topic]:
+        return
+    
+    # TODO Unsubscribe logic for an efficiency boost.
+    CALLBACKS[topic][pin].remove(fn)
+    

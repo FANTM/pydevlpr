@@ -1,20 +1,20 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.0.1' 
+VERSION = '0.1.0' 
 DESCRIPTION = 'Connect to any FANTM device'
-LONG_DESCRIPTION = 'Glue to attach any application to a FANTM device over websockets'
+LONG_DESCRIPTION = 'Frontend for connecting to devlprd and processing data from a FANTM DEVLPR'
 
 # Setting up
 setup(
-       # the name must match the folder name 'verysimplemodule'
-        name="libdevlpr", 
+        name="pydevlpr-fantm", 
         version=VERSION,
         author="Ezra Boley",
         author_email="hello@getfantm.com",
         description=DESCRIPTION,
         long_description=LONG_DESCRIPTION,
-        packages=find_packages(),
-        install_requires=['asyncio', 'websockets'], # add any additional packages that 
+        url='https://github.com/fantm/libdevlpr-plugin',
+        packages=find_packages(where="src"),
+        install_requires=['websockets'], # add any additional packages that 
         # needs to be installed along with your package.
         
         keywords=['python', 'FANTM', 'DEVLPR'],
