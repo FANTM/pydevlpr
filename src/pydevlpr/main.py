@@ -17,13 +17,20 @@ KILL_SYNC = threading.Lock()
 TELEM_SYNC = threading.Lock()
 CONNECTION_SYNC = threading.Lock()
 CONN_INFO = ("localhost", 8765)
-CALLBACKS: dict[str, dict[str, CallbackList_t]] = dict()
+CALLBACKS: dict[str, dict[int, CallbackList_t]] = dict()
 connection: server.WebSocketServerProtocol = None
 loop: asyncio.AbstractEventLoop = None
 t: threading.Thread = threading.Thread(target=None)
 kill: bool = False
 
-async def subscribe(topic: str) -> None:
+def check_can_add_callback(callbacks: dict[str, dict[int, CallbackList_t]], topic: str, pin: int):
+    if topic not in CALLBACKS:
+        callbacks[topic] = dict()
+    if pin not in CALLBACKS[topic]:
+        callbacks[topic][pin] = list()
+    return callbacks
+
+async def subscribe(topic: str, connection: server.WebSocketServerProtocol) -> None:
     await connection.send(wrap(PacketType.SUBSCRIBE, topic))
 
 async def connect(uri: str) -> None:
@@ -85,18 +92,20 @@ def stop() -> None:
         t.join()
         connection = None
 
-def add_callback(topic: str, pin: int, fn: Callback_t) -> None:
+def add_callback(topic: str, pin: int, fn: Callback_t, ws = None) -> None:
+    global CALLBACKS
+    if ws is not None:
+        socket = ws
+    else:
+        socket = connection
     start_if_needed()
-    if topic not in CALLBACKS:
-        CALLBACKS[topic] = dict()
-    if pin not in CALLBACKS[topic]:
-        CALLBACKS[topic][pin] = list()
+    CALLBACKS = check_can_add_callback(CALLBACKS, topic, pin)
+    if len(CALLBACKS[topic][pin]) == 0:
         with CONNECTION_SYNC:
-            if connection is None or connection.closed: # asyncio.run_coroutine_threadsafe(get_connection_open(), loop=loop).result(2):
+            if socket is None or socket.closed:
                 raise ConnectionError
-            asyncio.run_coroutine_threadsafe(subscribe(topic), loop=loop)
+            asyncio.run_coroutine_threadsafe(subscribe(topic, socket), loop=loop)
     CALLBACKS[topic][pin].append(fn)
-
 
 def remove_callback(topic: str, pin: int, fn: Callback_t) -> None:
     if topic not in CALLBACKS:
