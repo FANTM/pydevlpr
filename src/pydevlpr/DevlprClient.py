@@ -3,24 +3,27 @@ import threading
 import logging
 import websockets
 from websockets import server
-
+from typing import Optional
 from .protocol import unwrap, wrap, PacketType
 from .typing import CallbackList
 
 class DevlprClient:
     ADDRESS = ("localhost", 8765)
+
     def __init__(self) -> None:
         self.CONNECTION_SYNC = threading.Lock()
         self.TELEM_SYNC      = threading.Lock()
         self.CALLBACKS: dict[str, dict[int, CallbackList]] = dict()
-        self.loop: asyncio.AbstractEventLoop = None
-        self.connection: server.WebSocketServerProtocol = None
-        self.t: threading.Thread = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self.connection: Optional[server.WebSocketServerProtocol] = None
+        self.t: Optional[threading.Thread] = None
 
     async def connect(self, uri: str) -> None:
+        """Tries to connect to the daemon, and blocks the thread until either successful or it fails"""
+
         self.loop = asyncio.get_event_loop()
         try:
-            async with websockets.connect(uri) as websocket:
+            async with websockets.connect(uri) as websocket:  # type: ignore[attr-defined]
                 self.connection = websocket
                 self.CONNECTION_SYNC.release()
                 async for message in websocket:
@@ -52,4 +55,6 @@ class DevlprClient:
             self.start(uri)
 
     async def subscribe(self, topic: str, connection: server.WebSocketServerProtocol) -> None:
+        """Sends a message to the daemon telling it that something is listening to a topic."""
+        
         await connection.send(wrap(PacketType.SUBSCRIBE, topic))
