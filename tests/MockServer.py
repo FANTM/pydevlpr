@@ -8,7 +8,7 @@ class MockServer:
     recv_buffer: List[str] = list()
     
     def __init__(self):
-        self.address = ('localhost', 8765)
+        self.address = ('localhost', 8777)
         self.loop = asyncio.new_event_loop()
         self.server = None
 
