@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "pydevlpr"
-version = "0.1.1"
+version = "0.1.2"
 description = "Frontend for connecting to devlprd and processing data from a FANTM DEVLPR"
-authors = ["Ezra Boley <eboley@wisc.edu>"]
+authors = ["Ezra Boley <ezra@getfantm.com>"]
 license = "MIT"
+readme = "README.rst"
+repository = "https://github.com/FANTM/pydevlpr"
+documentation = "https://docs.getfantm.com"
 
 [tool.poetry.dependencies]
 python = "^3.9"
