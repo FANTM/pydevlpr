@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import queue
 import logging
 import websockets
 from websockets import server
@@ -18,6 +19,8 @@ class DevlprClient:
         self.connection_loop: Optional[asyncio.AbstractEventLoop] = None
         self.connection: Optional[server.WebSocketServerProtocol] = None
         self.connection_thread: Optional[threading.Thread] = None
+        self.callback_thread: Optional[threading.Thread] = None
+        self.callback_queue: Optional[queue.Queue] = None
 
     async def connect(self, uri: str, connect_event: threading.Event) -> None:
         """Tries to connect to the daemon, and blocks the thread until either successful or it fails"""
@@ -41,7 +44,7 @@ class DevlprClient:
                         if topic in self.CALLBACKS and pin in self.CALLBACKS[topic]:
                             for callback in self.CALLBACKS[topic][pin]:
                                 # don't call in this thread as we don't know how long it will take
-                                self.connection_loop.run_in_executor(self.callback_executor, callback, [data])
+                                self.callback_queue.put((callback,data))
         except ConnectionError:
             logging.error("Failed to connect")
         finally:
@@ -63,7 +66,15 @@ class DevlprClient:
     def start_if_needed(self) -> None:
         """Tries to intelligently determine if we're already connected, and only connects if we're not"""
 
-        if self.connection_thread is None or self.connection_thread.is_alive() == False:
+        # start up a worker thread for handling callbacks
+        if self.callback_thread is None or not self.callback_thread.is_alive():
+            # create our Queue
+            self.callback_queue = queue.Queue()
+            self.callback_thread = threading.Thread(target=self.handle_calllbacks)
+            self.callback_thread.start()
+
+        # start up the connection to the daemon if need be
+        if self.connection_thread is None or not self.connection_thread.is_alive():
             # need a URI for devlprd
             uri = "ws://{}:{}".format(DevlprClient.ADDRESS[0], DevlprClient.ADDRESS[1])
             # and also need an event to allow us to wait on connection establishment
@@ -112,3 +123,10 @@ class DevlprClient:
             if topic in self.CALLBACKS and pin in self.CALLBACKS[topic]:
                 # TODO Unsubscribe logic for an efficiency boost.
                 self.CALLBACKS[topic][pin].remove(fn)
+    
+    def handle_calllbacks(self) -> None:
+        while True:
+            # callbacks are enqueued as tuples of the callback and the data
+            cback, data = self.callback_queue.get()
+            cback(data)
+            self.callback_queue.task_done()
