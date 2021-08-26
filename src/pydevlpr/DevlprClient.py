@@ -19,7 +19,7 @@ class DevlprClient:
         self.connection: Optional[server.WebSocketServerProtocol] = None
         self.connection_thread: Optional[threading.Thread] = None
 
-    async def connect(self, uri: str) -> None:
+    async def connect(self, uri: str, connect_event: threading.Event) -> None:
         """Tries to connect to the daemon, and blocks the thread until either successful or it fails"""
 
         # we want an Executor to do the actual callback work
@@ -32,11 +32,13 @@ class DevlprClient:
         try:
             async with websockets.connect(uri) as websocket:  # type: ignore[attr-defined]
                 self.connection = websocket
+                # we established our connection, so set that event
+                connect_event.set()
                 async for message in websocket:
                     topic, pin, data = unwrap(message)
                     # before we go calling relevant callbacks, let's lock the list
                     with self.CALLBACK_LOCK:
-                        if topic in self.CALLBACKS:
+                        if topic in self.CALLBACKS and pin in self.CALLBACKS[topic]:
                             for callback in self.CALLBACKS[topic][pin]:
                                 # don't call in this thread as we don't know how long it will take
                                 self.connection_loop.run_in_executor(self.callback_executor, callback, [data])
@@ -52,18 +54,27 @@ class DevlprClient:
             raise ConnectionError
         await connection.send(wrap(PacketType.SUBSCRIBE, topic))
 
-    def start(self, uri: str) -> None:
+    def start(self, uri: str, connect_event: threading.Event) -> None:
         """Initializes a connection to the DEVLPR backend. Must be called first if you want anything else to work"""
 
-        self.connection_thread = threading.Thread(target=asyncio.run, args=[self.connect(uri)])
+        self.connection_thread = threading.Thread(target=asyncio.run, args=[self.connect(uri, connect_event)])
         self.connection_thread.start()
 
     def start_if_needed(self) -> None:
         """Tries to intelligently determine if we're already connected, and only connects if we're not"""
 
         if self.connection_thread is None or self.connection_thread.is_alive() == False:
+            # need a URI for devlprd
             uri = "ws://{}:{}".format(DevlprClient.ADDRESS[0], DevlprClient.ADDRESS[1])
-            self.start(uri)
+            # and also need an event to allow us to wait on connection establishment
+            connect_event = threading.Event()
+            # start the client, opening a connection on another thread
+            self.start(uri, connect_event)
+            # and wait for that connection event to go off
+            connect_complete = connect_event.wait(timeout=10)
+            if not connect_complete: # connect to deamon never completed
+                raise ConnectionError
+            
 
     def stop(self) -> None:
         if self.connection_thread is not None and self.connection_thread.is_alive:
