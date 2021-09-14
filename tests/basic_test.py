@@ -1,10 +1,11 @@
 import logging
-import websockets
-import pydevlpr
+import pydevlpr_protocol
 from pydevlpr.DevlprClient import DevlprClient
+from pydevlpr_protocol import wrap_packet, PacketType, DataTopic
 import pytest
-import time
 import sys, os
+
+from pydevlpr.DevlprServer import DevlprServer
 from .MockServer import MockServer
 
 sys.path.insert(0, os.path.dirname((os.path.abspath(__file__))))
@@ -15,60 +16,41 @@ def callback():
     logging.warning("Printed")
 
 @pytest.fixture()
-def server() -> MockServer:
-    global devlpr_client
-    server = MockServer()
-    server.start()
-    devlpr_client.CALLBACKS = {}
-    devlpr_client.loop = server.loop
+def client() -> DevlprClient:
+    client = DevlprClient()
+    client.start_if_needed()
+    yield client
+    client.stop()
+
+@pytest.fixture()
+def server() -> DevlprServer:
+    server = DevlprServer()
+    server.start_if_needed()
     yield server
     server.stop()
 
-# FIXME
-@pytest.mark.asyncio
-async def test_subscribe(server: MockServer):
-    client = DevlprClient()
-    client.subscribe()
+def test_addCallback(server, client):
+    topic = pydevlpr_protocol.DataTopic.RAW_DATA_TOPIC
+    pin = 0
+    client.add_callback(topic, pin, callback)
+    logging.warning(client.CALLBACKS)
+    assert client.CALLBACKS[topic][pin][0] is callback  # Added to callback list
 
-# FIXME
-@pytest.mark.asyncio
-async def test_addCallback(server):
-    uri = "ws://{}:{}".format(server.address[0], server.address[1])
-    async with websockets.connect(uri) as ws:
-        topic = "test"
-        pin = 0
-        add_callback(topic, pin, callback, ws)
-        assert devlpr_client.CALLBACKS[topic][pin][0] is callback  # Added to callback list
-        assert MockServer.recv_buffer[0] == "s|{}".format(topic)  # Sent a subscribe
+def test_removeCallback(server, client):
+    topic = DataTopic.RAW_DATA_TOPIC
+    pin = 0
+    client.CALLBACKS[topic] = dict()
+    client.CALLBACKS[topic][pin] = list()
+    client.CALLBACKS[topic][pin].append(callback)
+    assert len(client.CALLBACKS[topic][pin]) == 1
+    assert client.CALLBACKS[topic][pin][0] == callback
+    print(client.CALLBACKS[topic][pin])
+    client.remove_callback(topic, pin, callback)
+    print(client.CALLBACKS[topic][pin])
+    assert len(client.CALLBACKS[topic][pin]) == 0
 
-# FIXME
-@pytest.mark.asyncio
-async def test_removeCallback(server):
-    global devlpr_client
-    uri = "ws://{}:{}".format(server.address[0], server.address[1])
-    async with websockets.connect(uri) as ws:
-        topic = "test"
-        pin = 0
-        devlpr_client.CALLBACKS[topic] = dict()
-        devlpr_client.CALLBACKS[topic][pin] = list()
-        devlpr_client.CALLBACKS[topic][pin].append(callback)
-        assert len(devlpr_client.CALLBACKS[topic][pin]) == 1
-        assert devlpr_client.CALLBACKS[topic][pin][0] == callback
-        print(devlpr_client.CALLBACKS[topic][pin])
-        remove_callback(topic, pin, callback)
-        print(devlpr_client.CALLBACKS[topic][pin])
-        assert len(devlpr_client.CALLBACKS[topic][pin]) == 0
-        
-# FIXME
-@pytest.mark.asyncio
-async def test_stop(server):
-    global devlpr_client
-    uri = "ws://{}:{}".format(server.address[0], server.address[1])
-    devlpr_client.start(uri)
-    logging.info("Run for 2 seconds")
-    time.sleep(2)
-    logging.info("Shutdown")
-    stop()
-    assert devlpr_client.connection is None
-    assert not devlpr_client.t.is_alive()
+def test_stop(server, client):
+    client.stop()
+    assert client.connection is None
+
     

@@ -33,6 +33,12 @@ class DevlprClient:
             message = ' '
             while len(message) > 0:
                 message = await self.connection.recv()
+                
+                # Note: Sometimes we get a message that is just whitespace for some reason?
+                message = message.strip()
+                if len(message) == 0:
+                    continue
+                
                 topic, pin, data = unwrap_packet(message)
                 # before we go calling relevant callbacks, let's lock the list
                 with self.CALLBACK_LOCK:
