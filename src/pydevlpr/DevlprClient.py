@@ -3,7 +3,7 @@ import threading
 import queue
 import logging
 from typing import Optional
-from .protocol import unwrap, wrap, PacketType, DaemonSocket
+from pydevlpr_protocol import unwrap_packet, wrap_packet, PacketType, DaemonSocket
 from .typing import Callback, CallbackList
 from concurrent.futures import ThreadPoolExecutor
 

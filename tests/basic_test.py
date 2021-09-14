@@ -24,19 +24,13 @@ def server() -> MockServer:
     yield server
     server.stop()
 
+# FIXME
 @pytest.mark.asyncio
 async def test_subscribe(server: MockServer):
-    uri = "ws://{}:{}".format(server.address[0], server.address[1])
-    async with websockets.connect(uri) as ws:
-        topic = "test"
-        await devlpr_client.subscribe(topic, ws)
-        echo = await ws.recv()
-        assert echo == "s|{}".format(topic)
+    client = DevlprClient()
+    client.subscribe()
 
-# @pytest.mark.asyncio
-# async def test_connect(server: MockServer):
-#     uri = "ws://{}:{}".format(server.address[0], server.address[1]) 
-
+# FIXME
 @pytest.mark.asyncio
 async def test_addCallback(server):
     uri = "ws://{}:{}".format(server.address[0], server.address[1])
@@ -47,6 +41,7 @@ async def test_addCallback(server):
         assert devlpr_client.CALLBACKS[topic][pin][0] is callback  # Added to callback list
         assert MockServer.recv_buffer[0] == "s|{}".format(topic)  # Sent a subscribe
 
+# FIXME
 @pytest.mark.asyncio
 async def test_removeCallback(server):
     global devlpr_client
@@ -64,7 +59,7 @@ async def test_removeCallback(server):
         print(devlpr_client.CALLBACKS[topic][pin])
         assert len(devlpr_client.CALLBACKS[topic][pin]) == 0
         
-
+# FIXME
 @pytest.mark.asyncio
 async def test_stop(server):
     global devlpr_client

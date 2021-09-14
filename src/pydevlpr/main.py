@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 
-import asyncio
-import logging
-import threading
-
 from pydevlpr.DevlprClient import DevlprClient
-from .typing import Callback, CallbackList
-import websockets
-from websockets import server
+from .typing import Callback
 
 devlpr_client: DevlprClient = DevlprClient()
 
