@@ -33,7 +33,7 @@ class DevlprClient:
             message = ' '
             while len(message) > 0:
                 message = await self.connection.recv()
-                topic, pin, data = unwrap(message)
+                topic, pin, data = unwrap_packet(message)
                 # before we go calling relevant callbacks, let's lock the list
                 with self.CALLBACK_LOCK:
                     if topic in self.CALLBACKS and pin in self.CALLBACKS[topic]:
@@ -50,7 +50,7 @@ class DevlprClient:
         """Sends a message to the daemon telling it that something is listening to a topic."""
         if connection is None or connection.closed():
             raise ConnectionError
-        await connection.send(wrap(PacketType.SUBSCRIBE, topic))
+        await connection.send(wrap_packet(PacketType.SUBSCRIBE, topic))
 
     def start(self, connect_event: threading.Event) -> None:
         """Initializes a connection to the DEVLPR backend. Must be called first if you want anything else to work"""
