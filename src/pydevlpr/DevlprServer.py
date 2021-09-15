@@ -9,7 +9,9 @@ class DevlprServer:
         if self.started:
             return
         self.controller.start()
+        self.started = True
     
     def stop(self):
-        self.controller.stop()
-        
+        if self.started:
+            self.controller.stop()
+            self.started = False
