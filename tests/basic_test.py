@@ -1,15 +1,12 @@
+import sys, os
+sys.path.insert(0, os.path.abspath('./src'))
 import logging
 import pydevlpr_protocol
 from pydevlpr.DevlprClient import DevlprClient
 from pydevlpr_protocol import wrap_packet, PacketType, DataTopic
 import pytest
-import sys, os
 
 from pydevlpr.DevlprServer import DevlprServer
-from .MockServer import MockServer
-
-sys.path.insert(0, os.path.dirname((os.path.abspath(__file__))))
-
 from pydevlpr.main import devlpr_client, stop, add_callback, remove_callback
 
 def callback():
