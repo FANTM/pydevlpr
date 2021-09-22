@@ -1,8 +1,9 @@
 from .main import (
     stop,
-    add_callback
+    add_callback,
+    remove_callback
 )
 
-from .protocol import (
+from pydevlpr_protocol import (
     DataTopic
 )
