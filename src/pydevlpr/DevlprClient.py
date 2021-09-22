@@ -32,7 +32,12 @@ class DevlprClient:
             # spin on messages
             message = ' '
             while len(message) > 0:
-                message = await self.connection.recv()
+                try:
+                    message = await self.connection.recv()
+                except:
+                    # Note: probably need to handle specific issues
+                    logging.error("Failed on DaemonSocket.recv()")
+                    message = ''
                 
                 # Note: Sometimes we get a message that is just whitespace for some reason?
                 message = message.strip()
