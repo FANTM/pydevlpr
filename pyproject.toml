@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pydevlpr"
-version = "0.2.2"
+version = "0.2.3"
 description = "Frontend for connecting to devlprd and processing data from a FANTM DEVLPR"
 authors = ["Ezra Boley <hello@getfantm.com>", "Finn Kuusisto <hello@getfantm.com>"]
 license = "MIT"
