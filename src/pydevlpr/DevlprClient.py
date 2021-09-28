@@ -100,7 +100,7 @@ class DevlprClient:
                 res = asyncio.run_coroutine_threadsafe(self.connection.close(), loop=self.connection_loop)
                 try:
                     res.result(2)  # Timeout after 2 seconds if it really can't close
-                except asyncio.TimeoutError:
+                except:
                     logging.error("Failed to close connection gracefully")
             self.connection_thread.join()
             self.connection = None
