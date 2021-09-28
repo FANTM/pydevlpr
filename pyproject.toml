@@ -10,8 +10,8 @@ documentation = "https://docs.getfantm.com"
 
 [tool.poetry.dependencies]
 python = "^3.6"
-pydevlpr-protocol = "^0.1.0"
-devlprd = "^0.2.1"
+pydevlpr-protocol = ">=0.1.0"
+devlprd = ">=0.2.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"
