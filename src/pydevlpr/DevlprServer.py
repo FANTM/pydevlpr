@@ -1,9 +1,9 @@
 from devlprd import DaemonController
 
 class DevlprServer:
-    def __init__(self) -> None:
+    def __init__(self, board_id: str) -> None:
         self.started: bool = False
-        self.controller: DaemonController = DaemonController()
+        self.controller: DaemonController = DaemonController(board_id)
 
     def start_if_needed(self):
         if self.started:
