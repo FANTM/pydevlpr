@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 
+from time import sleep, time
 from .DevlprServer import DevlprServer
 from .DevlprClient import DevlprClient
 from .typing import Callback
 
 devlpr_client: DevlprClient = DevlprClient()
-devlpr_server: DevlprServer = DevlprServer()
+devlpr_server: DevlprServer = DevlprServer('Neuron')
 
 ## API ##
+def start() -> None:
+    """Manually start the front and backends. This leads to more responsive performance when adding callbacks"""
+    
+    devlpr_server.start_if_needed()
+    devlpr_client.start_if_needed()
 
 def stop() -> None:
     """Disconnects from the backend and end all communication"""

@@ -2,10 +2,10 @@ import asyncio
 import threading
 import queue
 import logging
+from time import sleep
 from typing import Optional
 from pydevlpr_protocol import unwrap_packet, wrap_packet, PacketType, DaemonSocket
 from .typing import Callback, CallbackList
-from concurrent.futures import ThreadPoolExecutor
 
 class DevlprClient:
     ADDRESS = ("localhost", 8765)
@@ -19,13 +19,29 @@ class DevlprClient:
         self.callback_thread: Optional[threading.Thread] = None
         self.callback_queue: Optional[queue.Queue] = None
 
+    async def try_open_connection(self, host, port):
+        max_attempts = 3
+        delay = 0.5
+        attempt = 1
+        while attempt <= max_attempts:
+            try:
+                reader, writer = await asyncio.open_connection(host, port)
+            except ConnectionError:
+                if attempt >= max_attempts:
+                    raise ConnectionError
+                else:
+                    sleep(delay * attempt)
+            finally:
+                attempt += 1
+        return (reader, writer)
+
     async def connect(self, host: str, port: int, connect_event: threading.Event) -> None:
         """Tries to connect to the daemon, and blocks the thread until either successful or it fails"""
 
         # grab the event loop we're listening/subscribing on for future use
         self.connection_loop = asyncio.get_event_loop()
         try:
-            reader, writer = await asyncio.open_connection(host, port)
+            reader, writer = await self.try_open_connection(host, port)
             self.connection = DaemonSocket(reader, writer)
             # we established our connection, so set that event
             connect_event.set()
@@ -51,7 +67,7 @@ class DevlprClient:
                         for callback in self.CALLBACKS[topic][pin]:
                             # don't call in this thread as we don't know how long it will take
                             self.callback_queue.put((callback,data))
-        except ConnectionError:
+        except ConnectionError as e:
             logging.error("Failed to connect")
         finally:
             if self.CALLBACK_LOCK.locked():

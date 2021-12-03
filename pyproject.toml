@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pydevlpr"
-version = "0.2.3"
+version = "0.3.0"
 description = "Frontend for connecting to devlprd and processing data from a FANTM DEVLPR"
 authors = ["Ezra Boley <hello@getfantm.com>", "Finn Kuusisto <hello@getfantm.com>"]
 license = "MIT"
@@ -9,9 +9,9 @@ repository = "https://github.com/FANTM/pydevlpr"
 documentation = "https://docs.getfantm.com"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.7,<3.11"
 pydevlpr-protocol = ">=0.1.0"
-devlprd = ">=0.2.1"
+devlprd = ">=0.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"
