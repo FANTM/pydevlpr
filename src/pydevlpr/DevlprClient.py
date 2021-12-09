@@ -8,7 +8,7 @@ from pydevlpr_protocol import unwrap_packet, wrap_packet, PacketType, DaemonSock
 from .typing import Callback, CallbackList
 
 class DevlprClient:
-    ADDRESS = ("localhost", 8765)
+    ADDRESS = ('localhost', 8765)
 
     def __init__(self) -> None:
         self.CALLBACK_LOCK      = threading.Lock()
@@ -20,19 +20,27 @@ class DevlprClient:
         self.callback_queue: Optional[queue.Queue] = None
 
     async def try_open_connection(self, host, port):
-        max_attempts = 3
+        max_attempts = 5
         delay = 0.5
         attempt = 1
-        while attempt <= max_attempts:
+        # while attempt <= max_attempts:
+        
+        while attempt < max_attempts:
             try:
-                reader, writer = await asyncio.open_connection(host, port)
-            except ConnectionError:
-                if attempt >= max_attempts:
-                    raise ConnectionError
-                else:
-                    sleep(delay * attempt)
-            finally:
+                connect_task = asyncio.create_task(asyncio.open_connection(host, port))
+                finished, unfinished = await asyncio.wait({connect_task}, timeout=10, return_when=asyncio.FIRST_COMPLETED)
+                
+                if connect_task in finished:
+                    reader, writer = connect_task.result()
+                
+                if reader is not None and writer is not None:
+                    break
+
+        # reader, writer = await asyncio.open_connection(host, port)
+            except (ConnectionError, OSError, TimeoutError) as e:
+                sleep(attempt * delay)
                 attempt += 1
+
         return (reader, writer)
 
     async def connect(self, host: str, port: int, connect_event: threading.Event) -> None:
