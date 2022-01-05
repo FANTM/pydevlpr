@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-from time import sleep, time
 from .DevlprServer import DevlprServer
 from .DevlprClient import DevlprClient
 from .typing import Callback
 
 devlpr_client: DevlprClient = DevlprClient()
-devlpr_server: DevlprServer = DevlprServer('Neuron')
+devlpr_server: DevlprServer = DevlprServer('DEVLPR')
 
 ## API ##
 def start() -> None:
